@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   Filter, 
@@ -8,66 +8,107 @@ import {
   Plus,
   Download,
   Calendar,
-  Banknote
+  Banknote,
+  Save,
+  X
 } from 'lucide-react';
+import { apiService, Payment, Member } from '../services/api';
+import toast from 'react-hot-toast';
 
 const Payments = () => {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    memberId: '',
+    amount: 5000,
+    method: '',
+    reference: '',
+    paidDate: new Date().toISOString().split('T')[0]
+  });
 
-  const payments = [
-    {
-      id: 1,
-      member: 'Jane Wanjiku',
-      amount: 5000,
-      dueDate: '2024-01-15',
-      paidDate: '2024-01-15',
-      status: 'paid',
-      method: 'M-Pesa',
-      reference: 'REF001'
-    },
-    {
-      id: 2,
-      member: 'Peter Kimani',
-      amount: 5000,
-      dueDate: '2024-01-15',
-      paidDate: null,
-      status: 'pending',
-      method: null,
-      reference: null
-    },
-    {
-      id: 3,
-      member: 'Mary Njeri',
-      amount: 5000,
-      dueDate: '2024-01-15',
-      paidDate: '2024-01-14',
-      status: 'paid',
-      method: 'Bank Transfer',
-      reference: 'REF002'
-    },
-    {
-      id: 4,
-      member: 'John Mwangi',
-      amount: 5000,
-      dueDate: '2024-01-10',
-      paidDate: null,
-      status: 'overdue',
-      method: null,
-      reference: null
-    },
-    {
-      id: 5,
-      member: 'Grace Akinyi',
-      amount: 5000,
-      dueDate: '2024-01-20',
-      paidDate: null,
-      status: 'upcoming',
-      method: null,
-      reference: null
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [paymentsData, membersData] = await Promise.all([
+        apiService.getPayments(),
+        apiService.getMembers()
+      ]);
+      setPayments(paymentsData);
+      setMembers(membersData);
+    } catch (error) {
+      toast.error('Failed to load payment data');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const handleRecordPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const member = members.find(m => m.id === formData.memberId);
+      if (!member) {
+        toast.error('Please select a member');
+        return;
+      }
+
+      const newPayment = await apiService.recordPayment({
+        memberId: formData.memberId,
+        memberName: member.name,
+        amount: formData.amount,
+        dueDate: new Date().toISOString().split('T')[0],
+        paidDate: formData.paidDate,
+        status: 'paid',
+        method: formData.method,
+        reference: formData.reference
+      });
+
+      setPayments(prev => [...prev, newPayment]);
+      setShowPaymentModal(false);
+      setFormData({
+        memberId: '',
+        amount: 5000,
+        method: '',
+        reference: '',
+        paidDate: new Date().toISOString().split('T')[0]
+      });
+    } catch (error) {
+      console.error('Error recording payment:', error);
+    }
+  };
+
+  const handleMarkAsPaid = async (paymentId: string) => {
+    const method = prompt('Payment method (M-Pesa, Bank Transfer, Cash):');
+    const reference = prompt('Reference number:');
+    
+    if (method && reference) {
+      try {
+        await apiService.markPaymentAsPaid(paymentId, method, reference);
+        setPayments(prev => prev.map(p => 
+          p.id === paymentId 
+            ? { ...p, status: 'paid', paidDate: new Date().toISOString().split('T')[0], method, reference }
+            : p
+        ));
+      } catch (error) {
+        console.error('Error marking payment as paid:', error);
+      }
+    }
+  };
+
+  const handleExportPayments = async () => {
+    try {
+      await apiService.exportToPDF(payments, 'Payment Records');
+    } catch (error) {
+      console.error('Error exporting payments:', error);
+    }
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -100,7 +141,7 @@ const Payments = () => {
   };
 
   const filteredPayments = payments.filter(payment => {
-    const matchesSearch = payment.member.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = payment.memberName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || payment.status === filterStatus;
     return matchesSearch && matchesFilter;
   });
@@ -109,8 +150,16 @@ const Payments = () => {
   const paidAmount = payments.filter(p => p.status === 'paid').reduce((sum, payment) => sum + payment.amount, 0);
   const pendingAmount = totalAmount - paidAmount;
 
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -118,13 +167,16 @@ const Payments = () => {
           <p className="text-gray-600">Track and manage member contributions</p>
         </div>
         <div className="flex space-x-3">
-          <button className="flex items-center space-x-2 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-lg hover:bg-emerald-50 transition-colors">
+          <button 
+            onClick={handleExportPayments}
+            className="flex items-center space-x-2 text-blue-600 border border-blue-200 px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+          >
             <Download className="w-5 h-5" />
             <span>Export</span>
           </button>
           <button
             onClick={() => setShowPaymentModal(true)}
-            className="flex items-center space-x-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
+            className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-emerald-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-emerald-700 transition-all duration-300 shadow-lg"
           >
             <Plus className="w-5 h-5" />
             <span>Record Payment</span>
@@ -160,7 +212,9 @@ const Payments = () => {
               <Banknote className="w-6 h-6 text-blue-600" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-gray-900 mb-1">{Math.round((paidAmount / totalAmount) * 100)}%</p>
+          <p className="text-2xl font-bold text-gray-900 mb-1">
+            {totalAmount > 0 ? Math.round((paidAmount / totalAmount) * 100) : 0}%
+          </p>
           <p className="text-sm text-gray-600">Collection Rate</p>
         </div>
       </div>
@@ -174,7 +228,7 @@ const Payments = () => {
             placeholder="Search payments..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
         <div className="relative">
@@ -182,7 +236,7 @@ const Payments = () => {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+            className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
           >
             <option value="all">All Status</option>
             <option value="paid">Paid</option>
@@ -211,7 +265,7 @@ const Payments = () => {
               {filteredPayments.map((payment) => (
                 <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
                   <td className="py-4 px-6">
-                    <p className="font-medium text-gray-900">{payment.member}</p>
+                    <p className="font-medium text-gray-900">{payment.memberName}</p>
                   </td>
                   <td className="py-4 px-6">
                     <p className="font-medium text-gray-900">KES {payment.amount.toLocaleString()}</p>
@@ -239,7 +293,10 @@ const Payments = () => {
                   </td>
                   <td className="py-4 px-6">
                     {payment.status !== 'paid' && (
-                      <button className="text-emerald-600 hover:text-emerald-700 text-sm font-medium">
+                      <button 
+                        onClick={() => handleMarkAsPaid(payment.id)}
+                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                      >
                         Mark as Paid
                       </button>
                     )}
@@ -255,39 +312,63 @@ const Payments = () => {
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Record Payment</h3>
-            <form className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Record Payment</h3>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleRecordPayment} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Member</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                <select 
+                  required
+                  value={formData.memberId}
+                  onChange={(e) => setFormData(prev => ({ ...prev, memberId: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
                   <option value="">Select member</option>
-                  <option value="peter">Peter Kimani</option>
-                  <option value="john">John Mwangi</option>
-                  <option value="grace">Grace Akinyi</option>
+                  {members.map(member => (
+                    <option key={member.id} value={member.id}>{member.name}</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                 <input
                   type="number"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  required
+                  value={formData.amount}
+                  onChange={(e) => setFormData(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="5000"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-                <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+                <select 
+                  required
+                  value={formData.method}
+                  onChange={(e) => setFormData(prev => ({ ...prev, method: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
                   <option value="">Select method</option>
-                  <option value="mpesa">M-Pesa</option>
-                  <option value="bank">Bank Transfer</option>
-                  <option value="cash">Cash</option>
+                  <option value="M-Pesa">M-Pesa</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cash">Cash</option>
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Reference Number</label>
                 <input
                   type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  required
+                  value={formData.reference}
+                  onChange={(e) => setFormData(prev => ({ ...prev, reference: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   placeholder="Transaction reference"
                 />
               </div>
@@ -295,7 +376,10 @@ const Payments = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
                 <input
                   type="date"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  required
+                  value={formData.paidDate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, paidDate: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
               <div className="flex space-x-3 pt-4">
@@ -308,9 +392,10 @@ const Payments = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                  className="flex-1 flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-emerald-600 text-white rounded-lg hover:from-blue-700 hover:to-emerald-700 transition-colors"
                 >
-                  Record Payment
+                  <Save className="w-4 h-4" />
+                  <span>Record Payment</span>
                 </button>
               </div>
             </form>

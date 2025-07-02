@@ -1,7 +1,7 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "chamabot-system",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,13 @@
   "dependencies": {
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "axios": "^1.6.0",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.0",
+    "xlsx": "^0.18.5",
+    "date-fns": "^2.30.0",
+    "react-hot-toast": "^2.4.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
