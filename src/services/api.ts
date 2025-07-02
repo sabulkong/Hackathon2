@@ -1,30 +1,128 @@
-import axios from 'axios';
 import toast from 'react-hot-toast';
 
-// API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
-const WHATSAPP_API_URL = import.meta.env.VITE_WHATSAPP_API_URL || 'https://graph.facebook.com/v18.0';
-const WHATSAPP_TOKEN = import.meta.env.VITE_WHATSAPP_TOKEN || '';
-
-// Create axios instance with CORS headers
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+// Mock data storage
+let mockMembers: Member[] = [
+  {
+    id: '1',
+    name: 'Jane Wanjiku',
+    phone: '+254712345678',
+    email: 'jane.wanjiku@email.com',
+    contribution: 5000,
+    status: 'active',
+    lastPayment: '2024-01-15',
+    totalPaid: 45000,
+    joinDate: '2023-02-10'
   },
-});
-
-// WhatsApp API instance
-const whatsappApi = axios.create({
-  baseURL: WHATSAPP_API_URL,
-  headers: {
-    'Authorization': `Bearer ${WHATSAPP_TOKEN}`,
-    'Content-Type': 'application/json',
+  {
+    id: '2',
+    name: 'Peter Kimani',
+    phone: '+254723456789',
+    email: 'peter.kimani@email.com',
+    contribution: 5000,
+    status: 'pending',
+    lastPayment: '2023-12-15',
+    totalPaid: 40000,
+    joinDate: '2023-01-15'
   },
-});
+  {
+    id: '3',
+    name: 'Mary Njeri',
+    phone: '+254734567890',
+    email: 'mary.njeri@email.com',
+    contribution: 5000,
+    status: 'overdue',
+    lastPayment: '2023-11-15',
+    totalPaid: 35000,
+    joinDate: '2023-01-01'
+  },
+  {
+    id: '4',
+    name: 'John Mwangi',
+    phone: '+254745678901',
+    email: 'john.mwangi@email.com',
+    contribution: 5000,
+    status: 'active',
+    lastPayment: '2024-01-15',
+    totalPaid: 50000,
+    joinDate: '2022-12-01'
+  }
+];
+
+let mockPayments: Payment[] = [
+  {
+    id: '1',
+    memberId: '1',
+    memberName: 'Jane Wanjiku',
+    amount: 5000,
+    dueDate: '2024-01-15',
+    paidDate: '2024-01-15',
+    status: 'paid',
+    method: 'M-Pesa',
+    reference: 'REF001'
+  },
+  {
+    id: '2',
+    memberId: '2',
+    memberName: 'Peter Kimani',
+    amount: 5000,
+    dueDate: '2024-01-15',
+    status: 'pending'
+  },
+  {
+    id: '3',
+    memberId: '3',
+    memberName: 'Mary Njeri',
+    amount: 5000,
+    dueDate: '2023-12-15',
+    status: 'overdue'
+  },
+  {
+    id: '4',
+    memberId: '4',
+    memberName: 'John Mwangi',
+    amount: 5000,
+    dueDate: '2024-01-15',
+    paidDate: '2024-01-15',
+    status: 'paid',
+    method: 'Bank Transfer',
+    reference: 'REF002'
+  }
+];
+
+let mockReminders: Reminder[] = [
+  {
+    id: '1',
+    name: 'Monthly Payment Reminder',
+    template: 'Hi {name}, this is a friendly reminder that your monthly contribution of KES {amount} is due on {date}. Please make your payment to keep our chama strong! 💪',
+    frequency: 'monthly',
+    nextSend: '2024-02-01',
+    recipients: 4,
+    status: 'active'
+  },
+  {
+    id: '2',
+    name: 'Overdue Payment Alert',
+    template: 'Hello {name}, your payment of KES {amount} is now overdue. Please settle your contribution as soon as possible to avoid penalties.',
+    frequency: 'weekly',
+    nextSend: '2024-01-22',
+    recipients: 1,
+    status: 'active'
+  }
+];
+
+let mockSettings: Settings = {
+  chamaName: 'Unity Savings Group',
+  defaultContribution: 5000,
+  paymentDueDay: 15,
+  currency: 'KES',
+  timezone: 'Africa/Nairobi',
+  whatsappBusinessName: 'Unity Savings Group Bot',
+  welcomeMessage: 'Welcome to Unity Savings Group! I\'m here to help you with payment reminders and updates.',
+  autoResponse: true,
+  readReceipts: true,
+  mpesaBusinessNumber: '123456',
+  bankAccountDetails: 'Bank: KCB Bank\nAccount: 1234567890\nName: Unity Savings Group'
+};
 
 // Types
 export interface Member {
@@ -75,249 +173,157 @@ export interface Settings {
   bankAccountDetails: string;
 }
 
+// Utility function to simulate API delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Generate unique ID
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
 // API Functions
 export const apiService = {
   // Members API
   async getMembers(): Promise<Member[]> {
-    try {
-      const response = await api.get('/members');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching members:', error);
-      // Return mock data for demo
-      return [
-        {
-          id: '1',
-          name: 'Jane Wanjiku',
-          phone: '+254712345678',
-          email: 'jane.wanjiku@email.com',
-          contribution: 5000,
-          status: 'active',
-          lastPayment: '2024-01-15',
-          totalPaid: 45000,
-          joinDate: '2023-02-10'
-        },
-        {
-          id: '2',
-          name: 'Peter Kimani',
-          phone: '+254723456789',
-          email: 'peter.kimani@email.com',
-          contribution: 5000,
-          status: 'pending',
-          lastPayment: '2023-12-15',
-          totalPaid: 40000,
-          joinDate: '2023-01-15'
-        }
-      ];
-    }
+    await delay(500); // Simulate network delay
+    return [...mockMembers];
   },
 
   async addMember(member: Omit<Member, 'id'>): Promise<Member> {
-    try {
-      const response = await api.post('/members', member);
-      toast.success('Member added successfully!');
-      return response.data;
-    } catch (error) {
-      toast.error('Failed to add member');
-      throw error;
-    }
+    await delay(300);
+    const newMember: Member = {
+      ...member,
+      id: generateId()
+    };
+    mockMembers.push(newMember);
+    toast.success('Member added successfully!');
+    return newMember;
   },
 
-  async updateMember(id: string, member: Partial<Member>): Promise<Member> {
-    try {
-      const response = await api.put(`/members/${id}`, member);
-      toast.success('Member updated successfully!');
-      return response.data;
-    } catch (error) {
-      toast.error('Failed to update member');
-      throw error;
+  async updateMember(id: string, memberUpdate: Partial<Member>): Promise<Member> {
+    await delay(300);
+    const index = mockMembers.findIndex(m => m.id === id);
+    if (index === -1) {
+      throw new Error('Member not found');
     }
+    mockMembers[index] = { ...mockMembers[index], ...memberUpdate };
+    toast.success('Member updated successfully!');
+    return mockMembers[index];
   },
 
   async deleteMember(id: string): Promise<void> {
-    try {
-      await api.delete(`/members/${id}`);
-      toast.success('Member deleted successfully!');
-    } catch (error) {
-      toast.error('Failed to delete member');
-      throw error;
+    await delay(300);
+    const index = mockMembers.findIndex(m => m.id === id);
+    if (index === -1) {
+      throw new Error('Member not found');
     }
+    mockMembers.splice(index, 1);
+    // Also remove related payments
+    mockPayments = mockPayments.filter(p => p.memberId !== id);
+    toast.success('Member deleted successfully!');
   },
 
   // Payments API
   async getPayments(): Promise<Payment[]> {
-    try {
-      const response = await api.get('/payments');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching payments:', error);
-      // Return mock data for demo
-      return [
-        {
-          id: '1',
-          memberId: '1',
-          memberName: 'Jane Wanjiku',
-          amount: 5000,
-          dueDate: '2024-01-15',
-          paidDate: '2024-01-15',
-          status: 'paid',
-          method: 'M-Pesa',
-          reference: 'REF001'
-        }
-      ];
-    }
+    await delay(500);
+    return [...mockPayments];
   },
 
   async recordPayment(payment: Omit<Payment, 'id'>): Promise<Payment> {
-    try {
-      const response = await api.post('/payments', payment);
-      toast.success('Payment recorded successfully!');
-      
-      // Send WhatsApp confirmation
-      await this.sendWhatsAppMessage(
-        payment.memberId,
-        `Great news! ✅ We've received your payment of KES ${payment.amount.toLocaleString()}. Thank you for keeping our chama strong! 🙌`
-      );
-      
-      return response.data;
-    } catch (error) {
-      toast.error('Failed to record payment');
-      throw error;
-    }
+    await delay(300);
+    const newPayment: Payment = {
+      ...payment,
+      id: generateId()
+    };
+    mockPayments.push(newPayment);
+    toast.success('Payment recorded successfully!');
+    
+    // Simulate WhatsApp confirmation
+    console.log(`WhatsApp message sent to ${payment.memberName}: Great news! ✅ We've received your payment of KES ${payment.amount.toLocaleString()}. Thank you for keeping our chama strong! 🙌`);
+    
+    return newPayment;
   },
 
   async markPaymentAsPaid(paymentId: string, method: string, reference: string): Promise<void> {
-    try {
-      await api.put(`/payments/${paymentId}/mark-paid`, {
-        paidDate: new Date().toISOString(),
-        method,
-        reference,
-        status: 'paid'
-      });
-      toast.success('Payment marked as paid!');
-    } catch (error) {
-      toast.error('Failed to mark payment as paid');
-      throw error;
+    await delay(300);
+    const index = mockPayments.findIndex(p => p.id === paymentId);
+    if (index === -1) {
+      throw new Error('Payment not found');
     }
+    mockPayments[index] = {
+      ...mockPayments[index],
+      paidDate: new Date().toISOString(),
+      method,
+      reference,
+      status: 'paid'
+    };
+    toast.success('Payment marked as paid!');
   },
 
   // Reminders API
   async getReminders(): Promise<Reminder[]> {
-    try {
-      const response = await api.get('/reminders');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching reminders:', error);
-      return [];
-    }
+    await delay(500);
+    return [...mockReminders];
   },
 
   async createReminder(reminder: Omit<Reminder, 'id'>): Promise<Reminder> {
-    try {
-      const response = await api.post('/reminders', reminder);
-      toast.success('Reminder created successfully!');
-      return response.data;
-    } catch (error) {
-      toast.error('Failed to create reminder');
-      throw error;
-    }
+    await delay(300);
+    const newReminder: Reminder = {
+      ...reminder,
+      id: generateId()
+    };
+    mockReminders.push(newReminder);
+    toast.success('Reminder created successfully!');
+    return newReminder;
   },
 
   async sendReminder(reminderId: string): Promise<void> {
-    try {
-      await api.post(`/reminders/${reminderId}/send`);
-      toast.success('Reminders sent successfully!');
-    } catch (error) {
-      toast.error('Failed to send reminders');
-      throw error;
+    await delay(500);
+    const reminder = mockReminders.find(r => r.id === reminderId);
+    if (!reminder) {
+      throw new Error('Reminder not found');
     }
+    console.log(`Sending reminder: ${reminder.name} to ${reminder.recipients} recipients`);
+    toast.success('Reminders sent successfully!');
   },
 
   // Settings API
   async getSettings(): Promise<Settings> {
-    try {
-      const response = await api.get('/settings');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching settings:', error);
-      // Return default settings
-      return {
-        chamaName: 'Unity Savings Group',
-        defaultContribution: 5000,
-        paymentDueDay: 15,
-        currency: 'KES',
-        timezone: 'Africa/Nairobi',
-        whatsappBusinessName: 'Unity Savings Group Bot',
-        welcomeMessage: 'Welcome to Unity Savings Group! I\'m here to help you with payment reminders and updates.',
-        autoResponse: true,
-        readReceipts: true,
-        mpesaBusinessNumber: '123456',
-        bankAccountDetails: 'Bank: KCB Bank\nAccount: 1234567890\nName: Unity Savings Group'
-      };
-    }
+    await delay(300);
+    return { ...mockSettings };
   },
 
-  async updateSettings(settings: Partial<Settings>): Promise<Settings> {
-    try {
-      const response = await api.put('/settings', settings);
-      toast.success('Settings updated successfully!');
-      return response.data;
-    } catch (error) {
-      toast.error('Failed to update settings');
-      throw error;
-    }
+  async updateSettings(settingsUpdate: Partial<Settings>): Promise<Settings> {
+    await delay(300);
+    mockSettings = { ...mockSettings, ...settingsUpdate };
+    toast.success('Settings updated successfully!');
+    return { ...mockSettings };
   },
 
-  // WhatsApp API
+  // WhatsApp API (Mock implementation)
   async sendWhatsAppMessage(memberId: string, message: string): Promise<void> {
-    try {
-      // Get member phone number
-      const members = await this.getMembers();
-      const member = members.find(m => m.id === memberId);
-      
-      if (!member) {
-        throw new Error('Member not found');
-      }
-
-      const phoneNumber = member.phone.replace('+', '');
-      
-      await whatsappApi.post(`/${import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID}/messages`, {
-        messaging_product: 'whatsapp',
-        to: phoneNumber,
-        type: 'text',
-        text: {
-          body: message
-        }
-      });
-      
-      console.log('WhatsApp message sent successfully');
-    } catch (error) {
-      console.error('Error sending WhatsApp message:', error);
-      // Don't throw error to prevent blocking other operations
+    await delay(200);
+    const member = mockMembers.find(m => m.id === memberId);
+    if (!member) {
+      throw new Error('Member not found');
     }
+    console.log(`WhatsApp message sent to ${member.name} (${member.phone}): ${message}`);
   },
 
   async sendBulkReminders(memberIds: string[], template: string): Promise<void> {
-    try {
-      const members = await this.getMembers();
-      const promises = memberIds.map(async (memberId) => {
-        const member = members.find(m => m.id === memberId);
-        if (member) {
-          const personalizedMessage = template
-            .replace('{name}', member.name)
-            .replace('{amount}', member.contribution.toLocaleString())
-            .replace('{date}', new Date().toLocaleDateString());
-          
-          await this.sendWhatsAppMessage(memberId, personalizedMessage);
-        }
-      });
-      
-      await Promise.all(promises);
-      toast.success('Bulk reminders sent successfully!');
-    } catch (error) {
-      toast.error('Failed to send bulk reminders');
-      throw error;
-    }
+    await delay(1000);
+    const promises = memberIds.map(async (memberId) => {
+      const member = mockMembers.find(m => m.id === memberId);
+      if (member) {
+        const personalizedMessage = template
+          .replace('{name}', member.name)
+          .replace('{amount}', member.contribution.toLocaleString())
+          .replace('{date}', new Date().toLocaleDateString());
+        
+        console.log(`WhatsApp message sent to ${member.name}: ${personalizedMessage}`);
+      }
+    });
+    
+    await Promise.all(promises);
+    toast.success('Bulk reminders sent successfully!');
   },
 
   // Export Functions
