@@ -13,7 +13,8 @@ import {
   BarChart3,
   MessageCircle,
   Zap,
-  ArrowRight
+  ArrowRight,
+  Bell
 } from 'lucide-react';
 
 const WhatsAppBot = () => {
