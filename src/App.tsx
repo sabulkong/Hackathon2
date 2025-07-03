@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   CreditCard, 
@@ -17,8 +17,15 @@ import {
   AlertCircle,
   XCircle,
   Bot,
-  Smartphone
+  Smartphone,
+  LogOut,
+  User
 } from 'lucide-react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import LoginForm from './components/auth/LoginForm';
+import SignupForm from './components/auth/SignupForm';
+import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
+import ProfileModal from './components/auth/ProfileModal';
 import Dashboard from './components/Dashboard';
 import Members from './components/Members';
 import Payments from './components/Payments';
@@ -28,36 +35,64 @@ import SettingsPanel from './components/Settings';
 import WhatsAppBot from './components/WhatsAppBot';
 
 type NavigationItem = 'dashboard' | 'members' | 'payments' | 'whatsapp' | 'reminders' | 'reports' | 'settings';
+type AuthView = 'login' | 'signup' | 'forgot-password';
 
-function App() {
+function AuthenticatedApp() {
+  const { user, profile, signOut, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<NavigationItem>('dashboard');
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
+  // Show loading spinner while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading ChamaPay Bot...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If no user, don't render the authenticated app
+  if (!user || !profile) {
+    return null;
+  }
 
   const navigationItems = [
-    { id: 'dashboard' as NavigationItem, label: 'Dashboard', icon: Home },
-    { id: 'members' as NavigationItem, label: 'Members', icon: Users },
-    { id: 'payments' as NavigationItem, label: 'Payments', icon: CreditCard },
-    { id: 'whatsapp' as NavigationItem, label: 'WhatsApp Bot', icon: Bot },
-    { id: 'reminders' as NavigationItem, label: 'Reminders', icon: Bell },
-    { id: 'reports' as NavigationItem, label: 'Reports', icon: FileText },
-    { id: 'settings' as NavigationItem, label: 'Settings', icon: Settings },
-  ];
+    { id: 'dashboard' as NavigationItem, label: 'Dashboard', icon: Home, roles: ['treasurer', 'member'] },
+    { id: 'members' as NavigationItem, label: 'Members', icon: Users, roles: ['treasurer'] },
+    { id: 'payments' as NavigationItem, label: 'Payments', icon: CreditCard, roles: ['treasurer', 'member'] },
+    { id: 'whatsapp' as NavigationItem, label: 'WhatsApp Bot', icon: Bot, roles: ['treasurer'] },
+    { id: 'reminders' as NavigationItem, label: 'Reminders', icon: Bell, roles: ['treasurer'] },
+    { id: 'reports' as NavigationItem, label: 'Reports', icon: FileText, roles: ['treasurer'] },
+    { id: 'settings' as NavigationItem, label: 'Settings', icon: Settings, roles: ['treasurer'] },
+  ].filter(item => item.roles.includes(profile.role));
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
       case 'members':
-        return <Members />;
+        return profile.role === 'treasurer' ? <Members /> : <Dashboard />;
       case 'payments':
         return <Payments />;
       case 'whatsapp':
-        return <WhatsAppBot />;
+        return profile.role === 'treasurer' ? <WhatsAppBot /> : <Dashboard />;
       case 'reminders':
-        return <Reminders />;
+        return profile.role === 'treasurer' ? <Reminders /> : <Dashboard />;
       case 'reports':
-        return <Reports />;
+        return profile.role === 'treasurer' ? <Reports /> : <Dashboard />;
       case 'settings':
-        return <SettingsPanel />;
+        return profile.role === 'treasurer' ? <SettingsPanel /> : <Dashboard />;
       default:
         return <Dashboard />;
     }
@@ -89,8 +124,44 @@ function App() {
                 <Bell className="w-5 h-5" />
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs"></span>
               </button>
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
-                <span className="text-white text-sm font-medium">A</span>
+              
+              {/* User Menu */}
+              <div className="relative group">
+                <button 
+                  onClick={() => setShowProfileModal(true)}
+                  className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
+                    <span className="text-white text-sm font-medium">
+                      {profile.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <p className="text-sm font-medium text-gray-900">{profile.full_name || 'User'}</p>
+                    <p className="text-xs text-gray-500 capitalize">{profile.role}</p>
+                  </div>
+                </button>
+                
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={() => setShowProfileModal(true)}
+                      className="flex items-center space-x-2 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+                    >
+                      <User className="w-4 h-4" />
+                      <span>Profile Settings</span>
+                    </button>
+                    <hr className="my-1" />
+                    <button
+                      onClick={handleSignOut}
+                      className="flex items-center space-x-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Sign Out</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -153,7 +224,100 @@ function App() {
           </main>
         </div>
       </div>
+
+      {/* Profile Modal */}
+      <ProfileModal 
+        isOpen={showProfileModal} 
+        onClose={() => setShowProfileModal(false)} 
+      />
     </div>
+  );
+}
+
+function UnauthenticatedApp() {
+  const [currentView, setCurrentView] = useState<AuthView>('login');
+
+  const renderAuthForm = () => {
+    switch (currentView) {
+      case 'login':
+        return (
+          <LoginForm 
+            onSwitchToSignup={() => setCurrentView('signup')}
+            onSwitchToForgotPassword={() => setCurrentView('forgot-password')}
+          />
+        );
+      case 'signup':
+        return (
+          <SignupForm 
+            onSwitchToLogin={() => setCurrentView('login')}
+          />
+        );
+      case 'forgot-password':
+        return (
+          <ForgotPasswordForm 
+            onSwitchToLogin={() => setCurrentView('login')}
+          />
+        );
+      default:
+        return (
+          <LoginForm 
+            onSwitchToSignup={() => setCurrentView('signup')}
+            onSwitchToForgotPassword={() => setCurrentView('forgot-password')}
+          />
+        );
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        {/* Logo and Branding */}
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 via-blue-600 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4">
+            <MessageSquare className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent mb-2">
+            ChamaPay Bot
+          </h1>
+          <p className="text-gray-600">Smart Payment Management System</p>
+        </div>
+
+        {/* Auth Form */}
+        {renderAuthForm()}
+      </div>
+    </div>
+  );
+}
+
+function AppContent() {
+  const { user, profile, loading } = useAuth();
+
+  // Show loading spinner while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading ChamaPay Bot...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authenticated app if user is logged in and has profile
+  if (user && profile) {
+    return <AuthenticatedApp />;
+  }
+
+  // Show unauthenticated app if no user
+  return <UnauthenticatedApp />;
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
