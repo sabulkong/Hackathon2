@@ -55,8 +55,20 @@ function AuthenticatedApp() {
   }
 
   // If no user, don't render the authenticated app
-  if (!user || !profile) {
+  if (!user) {
     return null;
+  }
+
+  // If user exists but no profile, show a simplified view
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Setting up your profile...</p>
+        </div>
+      </div>
+    );
   }
 
   const navigationItems = [
@@ -304,8 +316,8 @@ function AppContent() {
     );
   }
 
-  // Show authenticated app if user is logged in and has profile
-  if (user && profile) {
+  // Show authenticated app if user is logged in
+  if (user) {
     return <AuthenticatedApp />;
   }
 

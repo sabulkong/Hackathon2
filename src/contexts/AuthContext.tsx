@@ -17,7 +17,7 @@ interface AuthContextType {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, phone: string, role: 'treasurer' | 'member') => Promise<void>;
+  signUp: (email: string, password: string, profileData: { full_name: string; phone: string; role: 'treasurer' | 'member' }) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -99,16 +99,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error fetching profile:', error);
+        // If profile doesn't exist, create a default one
+        if (error.code === 'PGRST116') {
+          const defaultProfile = {
+            id: userId,
+            email: user?.email || '',
+            full_name: user?.user_metadata?.full_name || 'User',
+            phone: user?.user_metadata?.phone || '',
+            role: (user?.user_metadata?.role as 'treasurer' | 'member') || 'member',
+            created_at: new Date().toISOString()
+          };
+          setProfile(defaultProfile);
+        }
         return;
       }
 
       setProfile(data);
     } catch (error) {
       console.error('Error in fetchProfile:', error);
+      // Create a fallback profile from user metadata
+      if (user) {
+        const fallbackProfile = {
+          id: userId,
+          email: user.email || '',
+          full_name: user.user_metadata?.full_name || 'User',
+          phone: user.user_metadata?.phone || '',
+          role: (user.user_metadata?.role as 'treasurer' | 'member') || 'member',
+          created_at: new Date().toISOString()
+        };
+        setProfile(fallbackProfile);
+      }
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string, phone: string, role: 'treasurer' | 'member') => {
+  const signUp = async (email: string, password: string, profileData: { full_name: string; phone: string; role: 'treasurer' | 'member' }) => {
     try {
       setLoading(true);
       
@@ -116,11 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
         options: {
-          data: {
-            full_name: fullName,
-            phone,
-            role,
-          }
+          data: profileData
         }
       });
 
@@ -129,8 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        // Profile will be created automatically by the trigger
-        toast.success('Account created successfully! Please check your email to verify your account.');
+        toast.success('Account created successfully!');
       }
     } catch (error: any) {
       console.error('Error signing up:', error);
@@ -155,7 +174,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        toast.success('Welcome back!');
+        // Don't show toast here, let the auth state change handle it
+        console.log('Sign in successful');
       }
     } catch (error: any) {
       console.error('Error signing in:', error);
