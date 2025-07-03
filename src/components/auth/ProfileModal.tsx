@@ -160,7 +160,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
 
               <div className="bg-gray-50 p-3 rounded-lg">
                 <p className="text-sm text-gray-600">
-                  <strong>Role:</strong> {profile.role === 'treasurer' ? 'Treasurer/Admin' : \'Member'}
+                  <strong>Role:</strong> {profile.role === 'treasurer' ? 'Treasurer/Admin' : 'Member'}
                 </p>
               </div>
 
