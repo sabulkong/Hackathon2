@@ -42,62 +42,84 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // If Supabase is not configured, set loading to false and continue with mock data
-    if (!isSupabaseReady) {
-      console.warn('Supabase not configured, running in demo mode');
-      setLoading(false);
-      return;
-    }
+    let mounted = true;
 
-    // Get initial session
-    const getInitialSession = async () => {
+    const initializeAuth = async () => {
       try {
+        // If Supabase is not configured, skip auth and go to demo mode
+        if (!isSupabaseReady) {
+          console.log('Supabase not configured, running in demo mode');
+          if (mounted) {
+            setLoading(false);
+          }
+          return;
+        }
+
+        // Get initial session
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Error getting session:', error);
-          setLoading(false);
+          if (mounted) {
+            setLoading(false);
+          }
           return;
         }
 
-        setSession(session);
-        setUser(session?.user ?? null);
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
 
-        if (session?.user) {
-          await fetchProfile(session.user.id);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          }
+          
+          setLoading(false);
         }
       } catch (error) {
-        console.error('Error in getInitialSession:', error);
-      } finally {
-        setLoading(false);
+        console.error('Error in initializeAuth:', error);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
-    getInitialSession();
+    initializeAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        
-        setSession(session);
-        setUser(session?.user ?? null);
+    // Only set up auth listener if Supabase is ready
+    let subscription: any = null;
+    if (isSupabaseReady) {
+      const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          if (!mounted) return;
+          
+          console.log('Auth state changed:', event, session?.user?.email);
+          
+          setSession(session);
+          setUser(session?.user ?? null);
 
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setProfile(null);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          } else {
+            setProfile(null);
+          }
+
+          setLoading(false);
         }
+      );
+      subscription = authSubscription;
+    }
 
-        setLoading(false);
+    return () => {
+      mounted = false;
+      if (subscription) {
+        subscription.unsubscribe();
       }
-    );
-
-    return () => subscription.unsubscribe();
+    };
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    if (!isSupabaseReady) return;
+    if (!isSupabaseReady || !userId) return;
 
     try {
       const { data, error } = await supabase
@@ -108,14 +130,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error fetching profile:', error);
-        // If profile doesn't exist, create a default one
-        if (error.code === 'PGRST116') {
+        // Create a default profile if none exists
+        if (error.code === 'PGRST116' && user) {
           const defaultProfile = {
             id: userId,
-            email: user?.email || '',
-            full_name: user?.user_metadata?.full_name || 'User',
-            phone: user?.user_metadata?.phone || '',
-            role: (user?.user_metadata?.role as 'treasurer' | 'member') || 'member',
+            email: user.email || '',
+            full_name: user.user_metadata?.full_name || 'User',
+            phone: user.user_metadata?.phone || '',
+            role: (user.user_metadata?.role as 'treasurer' | 'member') || 'treasurer',
             created_at: new Date().toISOString()
           };
           setProfile(defaultProfile);
@@ -133,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email: user.email || '',
           full_name: user.user_metadata?.full_name || 'User',
           phone: user.user_metadata?.phone || '',
-          role: (user.user_metadata?.role as 'treasurer' | 'member') || 'member',
+          role: (user.user_metadata?.role as 'treasurer' | 'member') || 'treasurer',
           created_at: new Date().toISOString()
         };
         setProfile(fallbackProfile);
@@ -193,7 +215,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        console.log('Sign in successful');
+        toast.success('Welcome back!');
       }
     } catch (error: any) {
       console.error('Error signing in:', error);
@@ -275,7 +297,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
 
-      // Update local profile state
       setProfile(prev => prev ? { ...prev, ...updates } : null);
       toast.success('Profile updated successfully!');
     } catch (error: any) {

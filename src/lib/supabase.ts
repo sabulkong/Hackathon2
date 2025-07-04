@@ -10,10 +10,21 @@ const isSupabaseConfigured = supabaseUrl &&
   supabaseUrl !== 'your_supabase_project_url' && 
   supabaseAnonKey !== 'your_supabase_anon_key' &&
   supabaseUrl.startsWith('https://') &&
-  supabaseUrl.includes('.supabase.co');
+  supabaseUrl.includes('.supabase.co') &&
+  supabaseUrl.length > 30 && // Basic length check
+  supabaseAnonKey.length > 100; // JWT tokens are typically longer
+
+console.log('Supabase Configuration Check:', {
+  hasUrl: !!supabaseUrl,
+  hasKey: !!supabaseAnonKey,
+  urlValid: supabaseUrl?.startsWith('https://') && supabaseUrl?.includes('.supabase.co'),
+  keyValid: supabaseAnonKey?.length > 100,
+  isConfigured: isSupabaseConfigured
+});
 
 if (!isSupabaseConfigured) {
-  console.warn('Supabase is not properly configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+  console.warn('Supabase is not properly configured. Running in demo mode.');
+  console.warn('To enable authentication, please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
 }
 
 // Use actual values if configured, otherwise use safe placeholder values

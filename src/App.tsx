@@ -43,44 +43,15 @@ function AuthenticatedApp() {
   const [activeTab, setActiveTab] = useState<NavigationItem>('dashboard');
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  // Show loading spinner while checking authentication
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading ChamaPay Bot...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If Supabase is not configured or no user, show demo mode
-  if (!isSupabaseReady || !user) {
-    // Create a demo profile for the authenticated app
-    const demoProfile = {
-      id: 'demo-user',
-      email: 'demo@chamabot.com',
-      full_name: 'Demo Admin',
-      phone: '+254712345678',
-      role: 'treasurer' as const,
-      created_at: new Date().toISOString()
-    };
-
-    return <AuthenticatedAppContent profile={demoProfile} onSignOut={() => {}} />;
-  }
-
-  // If user exists but no profile, show a simplified view
-  if (!profile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Setting up your profile...</p>
-        </div>
-      </div>
-    );
-  }
+  // Create demo profile when Supabase is not ready or no profile exists
+  const effectiveProfile = profile || {
+    id: user?.id || 'demo-user',
+    email: user?.email || 'demo@chamabot.com',
+    full_name: user?.user_metadata?.full_name || 'Demo Admin',
+    phone: user?.user_metadata?.phone || '+254712345678',
+    role: (user?.user_metadata?.role as 'treasurer' | 'member') || 'treasurer',
+    created_at: new Date().toISOString()
+  };
 
   const handleSignOut = async () => {
     try {
@@ -90,13 +61,6 @@ function AuthenticatedApp() {
     }
   };
 
-  return <AuthenticatedAppContent profile={profile} onSignOut={handleSignOut} />;
-}
-
-function AuthenticatedAppContent({ profile, onSignOut }: { profile: any; onSignOut: () => void }) {
-  const [activeTab, setActiveTab] = useState<NavigationItem>('dashboard');
-  const [showProfileModal, setShowProfileModal] = useState(false);
-
   const navigationItems = [
     { id: 'dashboard' as NavigationItem, label: 'Dashboard', icon: Home, roles: ['treasurer', 'member'] },
     { id: 'members' as NavigationItem, label: 'Members', icon: Users, roles: ['treasurer'] },
@@ -105,24 +69,24 @@ function AuthenticatedAppContent({ profile, onSignOut }: { profile: any; onSignO
     { id: 'reminders' as NavigationItem, label: 'Reminders', icon: Bell, roles: ['treasurer'] },
     { id: 'reports' as NavigationItem, label: 'Reports', icon: FileText, roles: ['treasurer'] },
     { id: 'settings' as NavigationItem, label: 'Settings', icon: Settings, roles: ['treasurer'] },
-  ].filter(item => item.roles.includes(profile.role));
+  ].filter(item => item.roles.includes(effectiveProfile.role));
 
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />;
       case 'members':
-        return profile.role === 'treasurer' ? <Members /> : <Dashboard />;
+        return effectiveProfile.role === 'treasurer' ? <Members /> : <Dashboard />;
       case 'payments':
         return <Payments />;
       case 'whatsapp':
-        return profile.role === 'treasurer' ? <WhatsAppBot /> : <Dashboard />;
+        return effectiveProfile.role === 'treasurer' ? <WhatsAppBot /> : <Dashboard />;
       case 'reminders':
-        return profile.role === 'treasurer' ? <Reminders /> : <Dashboard />;
+        return effectiveProfile.role === 'treasurer' ? <Reminders /> : <Dashboard />;
       case 'reports':
-        return profile.role === 'treasurer' ? <Reports /> : <Dashboard />;
+        return effectiveProfile.role === 'treasurer' ? <Reports /> : <Dashboard />;
       case 'settings':
-        return profile.role === 'treasurer' ? <SettingsPanel /> : <Dashboard />;
+        return effectiveProfile.role === 'treasurer' ? <SettingsPanel /> : <Dashboard />;
       default:
         return <Dashboard />;
     }
@@ -152,10 +116,10 @@ function AuthenticatedAppContent({ profile, onSignOut }: { profile: any; onSignO
                   <span className="text-sm font-medium text-amber-700">Demo Mode</span>
                 </div>
               )}
-              {isSupabaseReady && (
+              {isSupabaseReady && user && (
                 <div className="hidden sm:flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-full">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                  <span className="text-sm font-medium text-emerald-700">WhatsApp Connected</span>
+                  <span className="text-sm font-medium text-emerald-700">Connected</span>
                 </div>
               )}
               <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors relative">
@@ -171,12 +135,12 @@ function AuthenticatedAppContent({ profile, onSignOut }: { profile: any; onSignO
                 >
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
                     <span className="text-white text-sm font-medium">
-                      {profile.full_name?.charAt(0) || profile.email?.charAt(0).toUpperCase()}
+                      {effectiveProfile.full_name?.charAt(0) || effectiveProfile.email?.charAt(0).toUpperCase()}
                     </span>
                   </div>
                   <div className="hidden sm:block text-left">
-                    <p className="text-sm font-medium text-gray-900">{profile.full_name || 'User'}</p>
-                    <p className="text-xs text-gray-500 capitalize">{profile.role}</p>
+                    <p className="text-sm font-medium text-gray-900">{effectiveProfile.full_name || 'User'}</p>
+                    <p className="text-xs text-gray-500 capitalize">{effectiveProfile.role}</p>
                   </div>
                 </button>
                 
@@ -190,14 +154,18 @@ function AuthenticatedAppContent({ profile, onSignOut }: { profile: any; onSignO
                       <User className="w-4 h-4" />
                       <span>Profile Settings</span>
                     </button>
-                    <hr className="my-1" />
-                    <button
-                      onClick={onSignOut}
-                      className="flex items-center space-x-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      <span>Sign Out</span>
-                    </button>
+                    {isSupabaseReady && user && (
+                      <>
+                        <hr className="my-1" />
+                        <button
+                          onClick={handleSignOut}
+                          className="flex items-center space-x-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span>Sign Out</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -275,11 +243,6 @@ function AuthenticatedAppContent({ profile, onSignOut }: { profile: any; onSignO
 function UnauthenticatedApp() {
   const [currentView, setCurrentView] = useState<AuthView>('login');
 
-  // If Supabase is not configured, skip authentication and go directly to the app
-  if (!isSupabaseReady) {
-    return <AuthenticatedApp />;
-  }
-
   const renderAuthForm = () => {
     switch (currentView) {
       case 'login':
@@ -333,9 +296,9 @@ function UnauthenticatedApp() {
 }
 
 function AppContent() {
-  const { user, profile, loading } = useAuth();
+  const { user, loading } = useAuth();
 
-  // Show loading spinner while checking authentication
+  // Show loading spinner only briefly while checking authentication
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-center justify-center">
