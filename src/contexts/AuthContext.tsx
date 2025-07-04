@@ -61,6 +61,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (error) {
           console.error('Error getting session:', error);
           if (mounted) {
+            setSession(null);
+            setUser(null);
+            setProfile(null);
             setLoading(false);
           }
           return;
@@ -71,7 +74,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(session?.user ?? null);
 
           if (session?.user) {
-            await fetchProfile(session.user.id);
+            try {
+              await fetchProfile(session.user.id);
+            } catch (profileError) {
+              console.error('Error fetching profile:', profileError);
+              // Continue anyway, don't block loading
+            }
           }
           
           setLoading(false);
@@ -99,12 +107,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(session?.user ?? null);
 
           if (session?.user) {
-            await fetchProfile(session.user.id);
+            try {
+              await fetchProfile(session.user.id);
+            } catch (profileError) {
+              console.error('Error fetching profile in auth change:', profileError);
+              // Create fallback profile
+              const fallbackProfile = createFallbackProfile(session.user);
+              setProfile(fallbackProfile);
+            }
           } else {
             setProfile(null);
           }
 
-          setLoading(false);
+          if (event !== 'INITIAL_SESSION') {
+            setLoading(false);
+          }
         }
       );
       subscription = authSubscription;
@@ -118,6 +135,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  const createFallbackProfile = (user: User): Profile => {
+    return {
+      id: user.id,
+      email: user.email || '',
+      full_name: user.user_metadata?.full_name || 'User',
+      phone: user.user_metadata?.phone || '',
+      role: (user.user_metadata?.role as 'treasurer' | 'member') || 'treasurer',
+      created_at: new Date().toISOString()
+    };
+  };
+
   const fetchProfile = async (userId: string) => {
     if (!isSupabaseReady || !userId) return;
 
@@ -130,17 +158,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.error('Error fetching profile:', error);
-        // Create a default profile if none exists
+        // Create a fallback profile if none exists
         if (error.code === 'PGRST116' && user) {
-          const defaultProfile = {
-            id: userId,
-            email: user.email || '',
-            full_name: user.user_metadata?.full_name || 'User',
-            phone: user.user_metadata?.phone || '',
-            role: (user.user_metadata?.role as 'treasurer' | 'member') || 'treasurer',
-            created_at: new Date().toISOString()
-          };
-          setProfile(defaultProfile);
+          const fallbackProfile = createFallbackProfile(user);
+          setProfile(fallbackProfile);
         }
         return;
       }
@@ -150,14 +171,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error in fetchProfile:', error);
       // Create a fallback profile from user metadata
       if (user) {
-        const fallbackProfile = {
-          id: userId,
-          email: user.email || '',
-          full_name: user.user_metadata?.full_name || 'User',
-          phone: user.user_metadata?.phone || '',
-          role: (user.user_metadata?.role as 'treasurer' | 'member') || 'treasurer',
-          created_at: new Date().toISOString()
-        };
+        const fallbackProfile = createFallbackProfile(user);
         setProfile(fallbackProfile);
       }
     }
