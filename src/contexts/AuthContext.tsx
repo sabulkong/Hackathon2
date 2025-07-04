@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseReady } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 interface Profile {
@@ -42,6 +42,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // If Supabase is not configured, set loading to false and continue with mock data
+    if (!isSupabaseReady) {
+      console.warn('Supabase not configured, running in demo mode');
+      setLoading(false);
+      return;
+    }
+
     // Get initial session
     const getInitialSession = async () => {
       try {
@@ -90,6 +97,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const fetchProfile = async (userId: string) => {
+    if (!isSupabaseReady) return;
+
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -133,6 +142,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signUp = async (email: string, password: string, profileData: { full_name: string; phone: string; role: 'treasurer' | 'member' }) => {
+    if (!isSupabaseReady) {
+      toast.error('Authentication not available in demo mode');
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -161,6 +175,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = async (email: string, password: string) => {
+    if (!isSupabaseReady) {
+      toast.error('Authentication not available in demo mode');
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -174,7 +193,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        // Don't show toast here, let the auth state change handle it
         console.log('Sign in successful');
       }
     } catch (error: any) {
@@ -187,6 +205,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    if (!isSupabaseReady) {
+      toast.error('Authentication not available in demo mode');
+      return;
+    }
+
     try {
       setLoading(true);
       
@@ -210,6 +233,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const resetPassword = async (email: string) => {
+    if (!isSupabaseReady) {
+      toast.error('Password reset not available in demo mode');
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
@@ -228,6 +256,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
+    if (!isSupabaseReady) {
+      toast.error('Profile updates not available in demo mode');
+      return;
+    }
+
     try {
       if (!user) {
         throw new Error('No user logged in');
@@ -253,6 +286,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updatePassword = async (newPassword: string) => {
+    if (!isSupabaseReady) {
+      toast.error('Password updates not available in demo mode');
+      return;
+    }
+
     try {
       const { error } = await supabase.auth.updateUser({
         password: newPassword

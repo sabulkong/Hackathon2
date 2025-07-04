@@ -22,6 +22,7 @@ import {
   User
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { isSupabaseReady } from './lib/supabase';
 import LoginForm from './components/auth/LoginForm';
 import SignupForm from './components/auth/SignupForm';
 import ForgotPasswordForm from './components/auth/ForgotPasswordForm';
@@ -54,9 +55,19 @@ function AuthenticatedApp() {
     );
   }
 
-  // If no user, don't render the authenticated app
-  if (!user) {
-    return null;
+  // If Supabase is not configured or no user, show demo mode
+  if (!isSupabaseReady || !user) {
+    // Create a demo profile for the authenticated app
+    const demoProfile = {
+      id: 'demo-user',
+      email: 'demo@chamabot.com',
+      full_name: 'Demo Admin',
+      phone: '+254712345678',
+      role: 'treasurer' as const,
+      created_at: new Date().toISOString()
+    };
+
+    return <AuthenticatedAppContent profile={demoProfile} onSignOut={() => {}} />;
   }
 
   // If user exists but no profile, show a simplified view
@@ -71,6 +82,21 @@ function AuthenticatedApp() {
     );
   }
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  return <AuthenticatedAppContent profile={profile} onSignOut={handleSignOut} />;
+}
+
+function AuthenticatedAppContent({ profile, onSignOut }: { profile: any; onSignOut: () => void }) {
+  const [activeTab, setActiveTab] = useState<NavigationItem>('dashboard');
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
   const navigationItems = [
     { id: 'dashboard' as NavigationItem, label: 'Dashboard', icon: Home, roles: ['treasurer', 'member'] },
     { id: 'members' as NavigationItem, label: 'Members', icon: Users, roles: ['treasurer'] },
@@ -80,14 +106,6 @@ function AuthenticatedApp() {
     { id: 'reports' as NavigationItem, label: 'Reports', icon: FileText, roles: ['treasurer'] },
     { id: 'settings' as NavigationItem, label: 'Settings', icon: Settings, roles: ['treasurer'] },
   ].filter(item => item.roles.includes(profile.role));
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -128,10 +146,18 @@ function AuthenticatedApp() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="hidden sm:flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-full">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-medium text-emerald-700">WhatsApp Connected</span>
-              </div>
+              {!isSupabaseReady && (
+                <div className="hidden sm:flex items-center space-x-2 bg-amber-50 px-3 py-1.5 rounded-full">
+                  <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-amber-700">Demo Mode</span>
+                </div>
+              )}
+              {isSupabaseReady && (
+                <div className="hidden sm:flex items-center space-x-2 bg-emerald-50 px-3 py-1.5 rounded-full">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-emerald-700">WhatsApp Connected</span>
+                </div>
+              )}
               <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors relative">
                 <Bell className="w-5 h-5" />
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs"></span>
@@ -145,7 +171,7 @@ function AuthenticatedApp() {
                 >
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
                     <span className="text-white text-sm font-medium">
-                      {profile.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase()}
+                      {profile.full_name?.charAt(0) || profile.email?.charAt(0).toUpperCase()}
                     </span>
                   </div>
                   <div className="hidden sm:block text-left">
@@ -166,7 +192,7 @@ function AuthenticatedApp() {
                     </button>
                     <hr className="my-1" />
                     <button
-                      onClick={handleSignOut}
+                      onClick={onSignOut}
                       className="flex items-center space-x-2 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
@@ -249,6 +275,11 @@ function AuthenticatedApp() {
 function UnauthenticatedApp() {
   const [currentView, setCurrentView] = useState<AuthView>('login');
 
+  // If Supabase is not configured, skip authentication and go directly to the app
+  if (!isSupabaseReady) {
+    return <AuthenticatedApp />;
+  }
+
   const renderAuthForm = () => {
     switch (currentView) {
       case 'login':
@@ -316,12 +347,12 @@ function AppContent() {
     );
   }
 
-  // Show authenticated app if user is logged in
-  if (user) {
+  // Show authenticated app if user is logged in OR if Supabase is not configured (demo mode)
+  if (user || !isSupabaseReady) {
     return <AuthenticatedApp />;
   }
 
-  // Show unauthenticated app if no user
+  // Show unauthenticated app if no user and Supabase is configured
   return <UnauthenticatedApp />;
 }
 
