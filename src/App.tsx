@@ -135,7 +135,7 @@ function AuthenticatedApp() {
                 >
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
                     <span className="text-white text-sm font-medium">
-                      {effectiveProfile.full_name?.charAt(0) || effectiveProfile.email?.charAt(0).toUpperCase()}
+                      {String(effectiveProfile.full_name || '').charAt(0) || String(effectiveProfile.email || '').charAt(0).toUpperCase()}
                     </span>
                   </div>
                   <div className="hidden sm:block text-left">
